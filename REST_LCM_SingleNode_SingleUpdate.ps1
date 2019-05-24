@@ -2,9 +2,9 @@
 
 $BuildAccount  = "admin"
 $PEAdmin       = "admin"
-$PEPass        = "nx2Tech959!"
-$PCCLIP        = "10.55.23.40"
-$PEClIP        = "10.55.23.37"
+$PEPass        = ""
+$PCCLIP        = ""
+$PEClIP        = ""
 
 
 
