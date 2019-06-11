@@ -6,3 +6,5 @@ REST-LCM-BuildPlan -datavar $datavar -datagen $datagen -mode "PC" -updates $Upda
 
 REST-LCM-Install -datavar $datavar -datagen $datagen -mode "PC" -updates $Updates
 
+Please note since 10 June, LCM has been updated to 2.2, LCM will auto update once an inventory is run.
+This script will be updated to support 2.1 asap, but does not atm. 
