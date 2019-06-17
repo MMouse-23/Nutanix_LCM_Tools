@@ -1,11 +1,15 @@
 Run:
+
 $Clusters = REST-Get-Clusters -datagen $datagen -datavar $datavar -mode "PC"
 Select the cluster from $clusters
 Get the UUID
 
-Populate the variables in the top.
+Populate the variables in the top, including the UUID
 
-Run the first half of the script to populate $updates.
+Run the first half of the script to populate $versions and $updates.
+
+Ignore the count messages in the above calls.
+
 Make sure $updates only contains the updates you wish to install
 then run 
 
