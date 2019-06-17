@@ -474,8 +474,8 @@ REST-LCM-Perform-Inventory -datavar $datavar -datagen $datagen -mode "PC"
     sleep 10
     $names = REST-LCMV2-Query-Versions -datagen $datagen -datavar $datavar -mode "PC"
   } until ($names.group_results.entity_results.count -ge $minimalupdates -or $groupcall -ge $maxgroupcallLoops)
-  $UUIDS = $names.group_results.entity_results.data.values.values | where {$_ -match ".*-.*-.*" -and $_ -notmatch "PC"}
-  
+  $UUIDS = $names.group_results.entity_results.data.values.values | where {$_ -match ".*-.*-.*" -and $_.length -eq 36}
+  $hosts = REST-PE-Get-Hosts -datagen $datagen -datavar $datavar 
   $versions = $null
   foreach ($app in $UUIDS){
     $nodeUUID = (((($names.group_results.entity_results | where {$_.data.values.values -eq $app}).data | where {$_.name -eq "location_id"}).values.values | select -last 1) -split ":")[1]
@@ -525,7 +525,7 @@ do {
     }
   } until ($result.total_entity_count -ge 1 -or $counter2 -ge 16)
 
-  $UUIDs = ($result.group_results.entity_results.data |where {$_.name -eq "entity_uuid"}).values.values | sort -unique
+  $UUIDS = $names.group_results.entity_results.data.values.values | where {$_ -match ".*-.*-.*" -and $_.length -eq 36}
 
   write-log -message "We have $($uuids.count) applications to be updated, seeking version"
   $names = REST-LCMV2-Query-Versions -datagen $datagen -datavar $datavar -mode "PC"
