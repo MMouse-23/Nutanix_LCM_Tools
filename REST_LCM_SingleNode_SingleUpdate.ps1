@@ -1,16 +1,22 @@
+
+
+
+
 #Input Data
 
 $BuildAccount  = "admin"
 $PEAdmin       = "admin"
-$PEPass        = ""
-$PCCLIP        = ""
-$PEClIP        = ""
+$PEPass        = "nx2Tech687!"
+$PCCLIP        = "10.42.46.40"
+$PEClIP        = "10.42.46.40"
 
+$ClusterUUID   = "00058b78-63ce-b488-0000-0000000076a8"
 
 
 $datagen = New-Object PSObject;
 $datagen | add-member Noteproperty BuildAccount        $BuildAccount    
 $datagen | add-member Noteproperty PCClusterIP         $PCCLIP;
+$datagen | add-member Noteproperty targetclusteruuid   $ClusterUUID;         
 
 $datavar = New-Object PSObject;
 $datavar | add-member Noteproperty PEAdmin             $PEAdmin;
@@ -18,6 +24,8 @@ $datavar | add-member Noteproperty PEPass              $PEPass
 $datavar | add-member Noteproperty PEClusterIP         $PECLIP;
 
 ##Functions
+
+
 
 ## Loading assemblies
 add-type @"
@@ -52,7 +60,7 @@ Function REST-LCM-Install {
 
   write-log -message "Executing LCM List Query"
 
-  $URL = "https://$($clusterip):9440/PrismGateway/services/rest/v1/genesis"
+  $URL = "https://$($clusterip):9440/PrismGateway/services/rest/v1/genesis?proxyClusterUuid=$($datagen.targetclusteruuid)"
 
   write-log -message "Using URL $URL"
 
@@ -98,72 +106,7 @@ Function write-log {
   }
 } 
 
-Function REST-LCM-Query-Groups-Names {
-  Param (
-    [object] $datagen,
-    [object] $datavar,
-    [string] $mode
-  )
-  if ($mode -eq "PC"){
-    $class =  "PC"
-    $clusterIP = $datagen.PCClusterIP
-  }  else {
-    $class =  "PE"
-    $clusterip = $datavar.PEClusterIP
-  }  
-  $credPair = "$($datagen.buildaccount):$($datavar.PEPass)"
-  $encodedCredentials = [System.Convert]::ToBase64String([System.Text.Encoding]::ASCII.GetBytes($credPair))
-  $headers = @{ Authorization = "Basic $encodedCredentials" }
 
-  write-log -message "Executing LCM List Query"
-
-  $URL = "https://$($clusterip):9440/api/nutanix/v3/groups"
-
-  write-log -message "Using URL $URL"
-
-$Payload= @"
-{
-  "entity_type": "lcm_entity",
-  "group_member_count": 1000,
-  "group_member_attributes": [{
-    "attribute": "id"
-  }, {
-    "attribute": "uuid"
-  }, {
-    "attribute": "entity_model"
-  }, {
-    "attribute": "version"
-  }, {
-    "attribute": "location_id"
-  }, {
-    "attribute": "entity_class"
-  }, {
-    "attribute": "description"
-  }, {
-    "attribute": "last_updated_time_usecs"
-  }, {
-    "attribute": "request_version"
-  }, {
-    "attribute": "_master_cluster_uuid_"
-  }],
-  "query_name": "prism:LCMQueryModel",
-  "filter_criteria": ""
-}
-"@ 
-
-  $JSON = $Payload 
-  try{
-    $task = Invoke-RestMethod -Uri $URL -method "post" -body $JSON -ContentType 'application/json' -headers $headers;
-  } catch {
-    sleep 10
-    $FName = Get-FunctionName;write-log -message "Error Caught on function $FName" -sev "WARN"
-
-    $task = Invoke-RestMethod -Uri $URL -method "post" -body $JSON -ContentType 'application/json' -headers $headers;
-  }
-  write-log -message "We found $($task.group_results.entity_results.count) items."
-
-  Return $task
-} 
 
   
   Function Wait-Task{
@@ -228,7 +171,7 @@ Function REST-Get-AOS-LegacyTask {
   #output suppressed for task loopers
   #write-log -message "Executing LCM List Query"
 
-  $URL = "https://$($clusterip):9440/PrismGateway/services/rest/v1/progress_monitors"
+  $URL = "https://$($clusterip):9440/PrismGateway/services/rest/v1/progress_monitors?proxyClusterUuid=$($datagen.targetclusteruuid)"
 
    # write-log -message "Using URL $URL"
 
@@ -246,15 +189,17 @@ Function REST-Get-AOS-LegacyTask {
 } 
 
 
-Function REST-LCM-Query-Groups-Versions {
+Function REST-LCMV2-Query-Versions {
   Param (
     [object] $datagen,
     [object] $datavar,
     [string] $mode
   )
   if ($mode -eq "PC"){
+    $class =  "PC"
     $clusterIP = $datagen.PCClusterIP
   }  else {
+    $class =  "PE"
     $clusterip = $datavar.PEClusterIP
   }  
   $credPair = "$($datagen.buildaccount):$($datavar.PEPass)"
@@ -263,39 +208,12 @@ Function REST-LCM-Query-Groups-Versions {
 
   write-log -message "Executing LCM List Query"
 
-  $URL = "https://$($clusterip):9440/api/nutanix/v3/groups"
+  $URL = "https://$($clusterip):9440/PrismGateway/services/rest/v1/genesis?proxyClusterUuid=$($datagen.targetclusteruuid)"
 
   write-log -message "Using URL $URL"
 
 $Payload= @"
-{
-  "entity_type": "lcm_available_version",
-  "grouping_attribute": "entity_uuid",
-  "group_member_count": 1000,
-  "group_member_attributes": [
-    {
-      "attribute": "uuid"
-    },
-    {
-      "attribute": "entity_uuid"
-    },
-    {
-      "attribute": "entity_class"
-    },
-    {
-      "attribute": "status"
-    },
-    {
-      "attribute": "version"
-    },
-    {
-      "attribute": "dependencies"
-    },
-    {
-      "attribute": "order"
-    }
-  ]
-}
+{"value":"{\".oid\":\"LifeCycleManager\",\".method\":\"lcm_framework_rpc\",\".kwargs\":{\"method_class\":\"LcmFramework\",\"method\":\"v3_group_api\",\"args\":[\"{\\\"entity_type\\\":\\\"lcm_entity_v2\\\",\\\"group_member_count\\\":500,\\\"group_member_attributes\\\":[{\\\"attribute\\\":\\\"id\\\"},{\\\"attribute\\\":\\\"uuid\\\"},{\\\"attribute\\\":\\\"entity_model\\\"},{\\\"attribute\\\":\\\"version\\\"},{\\\"attribute\\\":\\\"location_id\\\"},{\\\"attribute\\\":\\\"entity_class\\\"},{\\\"attribute\\\":\\\"description\\\"},{\\\"attribute\\\":\\\"last_updated_time_usecs\\\"},{\\\"attribute\\\":\\\"request_version\\\"},{\\\"attribute\\\":\\\"_master_cluster_uuid_\\\"},{\\\"attribute\\\":\\\"entity_type\\\"},{\\\"attribute\\\":\\\"single_group_uuid\\\"}],\\\"query_name\\\":\\\"lcm:EntityGroupModel\\\",\\\"grouping_attribute\\\":\\\"location_id\\\",\\\"filter_criteria\\\":\\\"entity_type==firmware\\\"}\"]}}"}
 "@ 
 
   $JSON = $Payload 
@@ -307,9 +225,104 @@ $Payload= @"
 
     $task = Invoke-RestMethod -Uri $URL -method "post" -body $JSON -ContentType 'application/json' -headers $headers;
   }
-  write-log -message "We found $($task.group_results.entity_results.count) items."
+  
+  $object = ($task.value | ConvertFrom-Json).".return"
+  write-log -message "We found $($object.group_results.entity_results.count) items."
+  Return $object
+} 
 
-  Return $task
+
+
+Function REST-Get-Clusters {
+  Param (
+    [object] $datagen,
+    [object] $datavar,
+    [string] $mode
+  )
+  if ($mode -eq "PC"){
+    $clusterIP = $datagen.PCClusterIP
+  }  else {
+    $clusterip = $datavar.PEClusterIP
+  }  
+  write-log -message "Debug level is $debug";
+  write-log -message "Building Credential object"
+  $credPair = "$($datagen.buildaccount):$($datavar.pepass)"
+  $encodedCredentials = [System.Convert]::ToBase64String([System.Text.Encoding]::ASCII.GetBytes($credPair))
+  $headers = @{ Authorization = "Basic $encodedCredentials" }
+
+  write-log -message "Building Cluster Query JSON"
+
+  $URL = "https://$($clusterip):9440/api/nutanix/v3/clusters/list"
+  $Payload= @{
+    kind="cluster"
+    offset=0
+    length=999
+  } 
+
+  $JSON = $Payload | convertto-json
+  try{
+    $task = Invoke-RestMethod -Uri $URL -method "post" -body $JSON -ContentType 'application/json' -headers $headers;
+  } catch {
+    sleep 10
+    $task = Invoke-RestMethod -Uri $URL -method "post" -body $JSON -ContentType 'application/json' -headers $headers;
+  }
+  if ($task.entities.count -eq 0){
+
+    write-log -message "0? Let me try that again after a small nap."
+
+    do {
+      $task = Invoke-RestMethod -Uri $URL -method "post" -body $JSON -ContentType 'application/json' -headers $headers;
+      sleep 30
+      $count++
+
+      write-log -message "Cycle $count Getting Clusters, current items found is $($task.entities.count)"
+    } until ($count -ge 10 -or $task.entities.count -ge 1)
+  }
+  write-log -message "We found $($task.entities.count) clusters"
+  return $task
+} 
+
+
+Function REST-LCMV2-Query-Updates {
+  Param (
+    [object] $datagen,
+    [object] $datavar,
+    [string] $mode
+  )
+  if ($mode -eq "PC"){
+    $class =  "PC"
+    $clusterIP = $datagen.PCClusterIP
+  }  else {
+    $class =  "PE"
+    $clusterip = $datavar.PEClusterIP
+  }  
+  $credPair = "$($datagen.buildaccount):$($datavar.PEPass)"
+  $encodedCredentials = [System.Convert]::ToBase64String([System.Text.Encoding]::ASCII.GetBytes($credPair))
+  $headers = @{ Authorization = "Basic $encodedCredentials" }
+
+  write-log -message "Executing LCM List Query"
+
+  $URL = "https://$($clusterip):9440/PrismGateway/services/rest/v1/genesis?proxyClusterUuid=$($datagen.targetclusteruuid)"
+
+  write-log -message "Using URL $URL"
+
+$Payload= @"
+{"value":"{\".oid\":\"LifeCycleManager\",\".method\":\"lcm_framework_rpc\",\".kwargs\":{\"method_class\":\"LcmFramework\",\"method\":\"v3_group_api\",\"args\":[\"{\\\"entity_type\\\":\\\"lcm_available_version_v2\\\",\\\"group_member_count\\\":500,\\\"group_member_attributes\\\":[{\\\"attribute\\\":\\\"uuid\\\"},{\\\"attribute\\\":\\\"entity_uuid\\\"},{\\\"attribute\\\":\\\"entity_class\\\"},{\\\"attribute\\\":\\\"status\\\"},{\\\"attribute\\\":\\\"version\\\"},{\\\"attribute\\\":\\\"dependencies\\\"},{\\\"attribute\\\":\\\"single_group_uuid\\\"},{\\\"attribute\\\":\\\"_master_cluster_uuid_\\\"},{\\\"attribute\\\":\\\"order\\\"}],\\\"query_name\\\":\\\"lcm:VersionModel\\\"}\"]}}"}
+"@ 
+
+  $JSON = $Payload 
+  try{
+    $task = Invoke-RestMethod -Uri $URL -method "post" -body $JSON -ContentType 'application/json' -headers $headers;
+  } catch {
+    sleep 10
+    $FName = Get-FunctionName;write-log -message "Error Caught on function $FName" -sev "WARN"
+
+    $task = Invoke-RestMethod -Uri $URL -method "post" -body $JSON -ContentType 'application/json' -headers $headers;
+  }
+
+  $object = ($task.value | ConvertFrom-Json).".return"
+  write-log -message "We found $($object.group_results.entity_results.count) items."
+  Return $object
 } 
 
 
@@ -331,7 +344,7 @@ Function REST-LCM-BuildPlan {
 
   write-log -message "Executing LCM List Query"
 
-  $URL = "https://$($clusterip):9440/PrismGateway/services/rest/v1/genesis"
+  $URL = "https://$($clusterip):9440/PrismGateway/services/rest/v1/genesis?proxyClusterUuid=$($datagen.targetclusteruuid)"
 
   write-log -message "Using URL $URL"
 
@@ -381,7 +394,7 @@ Function REST-LCM-Perform-Inventory {
   $headers = @{ Authorization = "Basic $encodedCredentials" }
   write-log -message "Connecting to $clusterip"
   write-log -message "Mode is $mode"
-  $URL = "https://$($clusterip):9440/PrismGateway/services/rest/v1/genesis"
+  $URL = "https://$($clusterip):9440/PrismGateway/services/rest/v1/genesis?proxyClusterUuid=$($datagen.targetclusteruuid)"
   $json1 = @"
 {
     "value":"{\".oid\":\"LifeCycleManager\",\".method\":\"lcm_framework_rpc\",\".kwargs\":{\"method_class\":\"LcmFramework\",\"method\":\"configure\",\"args\":[\"http://download.nutanix.com/lcm/2.0\",null,null,true]}}"
@@ -410,16 +423,21 @@ Function REST-LCM-Perform-Inventory {
 Function REST-PE-Get-Hosts {
   Param (
     [object] $datagen,
-    [object] $datavar
+    [object] $datavar,
+    [string] $mode
   )
-  $clusterip = $datavar.PEClusterIP
+  if ($mode -eq "PC"){
+    $clusterIP = $datagen.PCClusterIP
+  }  else {
+    $clusterip = $datavar.PEClusterIP
+  }  
   $credPair = "$($datagen.buildaccount):$($datavar.PEPass)"
   $encodedCredentials = [System.Convert]::ToBase64String([System.Text.Encoding]::ASCII.GetBytes($credPair))
   $headers = @{ Authorization = "Basic $encodedCredentials" }
 
   write-log -message "Executing Get Hosts Query"
 
-  $URL = "https://$($clusterip):9440/PrismGateway/services/rest/v1/hosts"
+  $URL = "https://$($clusterip):9440/PrismGateway/services/rest/v1/hosts?proxyClusterUuid=$($datagen.targetclusteruuid)"
 
   write-log -message "Using URL $URL"
 
@@ -437,15 +455,51 @@ Function REST-PE-Get-Hosts {
   Return $task
 } 
 
-#Logic
-REST-LCM-Perform-Inventory -datavar $datavar -datagen $datagen -mode "PE"
-sleep 60
+
+$Clusters = REST-Get-Clusters -datagen $datagen -datavar $datavar -mode "PC"
+
+### use the cluster ID and set it in the above code
+
+#Logic Inventory
+
+REST-LCM-Perform-Inventory -datavar $datavar -datagen $datagen -mode "PC"
+
+
+#Logic Current
+
+  write-log -message "Checking Which version we have now."
+  $groupcal = 0
+  do {
+    $groupcall ++
+    sleep 10
+    $names = REST-LCMV2-Query-Versions -datagen $datagen -datavar $datavar -mode "PC"
+  } until ($names.group_results.entity_results.count -ge $minimalupdates -or $groupcall -ge $maxgroupcallLoops)
+  $UUIDS = $names.group_results.entity_results.data.values.values | where {$_ -match ".*-.*-.*" -and $_ -notmatch "PC"}
+  
+  $versions = $null
+  foreach ($app in $UUIDS){
+    $nodeUUID = (((($names.group_results.entity_results | where {$_.data.values.values -eq $app}).data | where {$_.name -eq "location_id"}).values.values | select -last 1) -split ":")[1]
+    $PHhost = $hosts.entities | where {$_.uuid -match $nodeuuid}
+    $Entity = [PSCustomObject]@{
+      Version     = (($names.group_results.entity_results | where {$_.data.values.values -eq $app}).data | where {$_.name -eq "version"}).values.values | select -last 1
+      Class       = (($names.group_results.entity_results | where {$_.data.values.values -eq $app}).data | where {$_.name -eq "entity_class"}).values.values | select -last 1
+      Name        = (($names.group_results.entity_results | where {$_.data.values.values -eq $app}).data | where {$_.name -eq "entity_model"}).values.values | select -last 1
+      UUID        = $app
+      HostName    = $PHhost.name
+    }
+    [array]$versions += $entity     
+  }  
+  write-log -message "Getting Last Calm Version" 
+
+
+
+
 do {
     $counter2++
     
     write-log -message "Checking Results"
     sleep 60
-    $result = REST-LCM-Query-Groups-Versions -datagen $datagen -datavar $datavar -mode "PE"
+    $result = REST-LCMV2-Query-Updates -datagen $datagen -datavar $datavar -mode "PC"
   
     if ($result.total_entity_count -lt 1){ 
   
@@ -453,20 +507,20 @@ do {
       
       Wait-Task
       sleep 110
-      $result = REST-LCM-Query-Groups-Versions -datagen $datagen -datavar $datavar -mode "PE"
+      $result = REST-LCMV2-Query-Updates -datagen $datagen -datavar $datavar -mode "PC"
     }
     if ($result.total_entity_count -lt 1 -and $counter2 -lt 2){
 
       write-log -message "Running LCM Inventory Again"
 
-      REST-LCM-Perform-Inventory -datavar $datavar -datagen $datagen -mode "PE"
+      REST-LCM-Perform-Inventory -datavar $datavar -datagen $datagen -mode "PC"
       sleep 115      
     }
     if ($counter2 -eq 5 -or $counter2 -eq 12){
 
       write-log -message "Running LCM Inventory Again"
 
-      REST-LCM-Perform-Inventory -datavar $datavar -datagen $datagen -mode "PE"
+      REST-LCM-Perform-Inventory -datavar $datavar -datagen $datagen -mode "PC"
       sleep 115
     }
   } until ($result.total_entity_count -ge 1 -or $counter2 -ge 16)
@@ -474,7 +528,7 @@ do {
   $UUIDs = ($result.group_results.entity_results.data |where {$_.name -eq "entity_uuid"}).values.values | sort -unique
 
   write-log -message "We have $($uuids.count) applications to be updated, seeking version"
-  $names = REST-LCM-Query-Groups-Names -datagen $datagen -datavar $datavar -mode "PE"
+  $names = REST-LCMV2-Query-Versions -datagen $datagen -datavar $datavar -mode "PC"
   $hosts = REST-PE-Get-Hosts -datagen $datagen -datavar $datavar 
   $Updates = $null
   foreach ($app in $UUIDs){
@@ -493,12 +547,20 @@ do {
 
 ## Stop testing beyond here
 
+
+$versions
+
+
+$updates
+
+
 ## Play and manipulate $Updates before sending it into the functions below.
 
-  write-log -message "Building a LCM update Plan" -slacklevel 1
+write-log -message "Building a LCM update Plan" -slacklevel 1
 
-  REST-LCM-BuildPlan -datavar $datavar -datagen $datagen -mode "PC" -updates $Updates
+REST-LCM-BuildPlan -datavar $datavar -datagen $datagen -mode "PC" -updates $Updates
 
-  write-log -message "Installing Updates" -slacklevel 1
+write-log -message "Installing Updates" -slacklevel 1
 
-  REST-LCM-Install -datavar $datavar -datagen $datagen -mode "PC" -updates $Updates
+REST-LCM-Install -datavar $datavar -datagen $datagen -mode "PC" -updates $Updates
+
