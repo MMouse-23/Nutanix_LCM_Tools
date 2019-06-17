@@ -6,11 +6,11 @@
 
 $BuildAccount  = "admin"
 $PEAdmin       = "admin"
-$PEPass        = "nx2Tech687!"
-$PCCLIP        = "10.42.46.40"
-$PEClIP        = "10.42.46.40"
+$PEPass        = ""
+$PCCLIP        = ""
+$PEClIP        = ""
 
-$ClusterUUID   = "00058b78-63ce-b488-0000-0000000076a8"
+$ClusterUUID   = ""
 
 
 $datagen = New-Object PSObject;
