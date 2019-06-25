@@ -17,5 +17,6 @@ REST-LCM-BuildPlan -datavar $datavar -datagen $datagen -mode "PC" -updates $Upda
 
 REST-LCM-Install -datavar $datavar -datagen $datagen -mode "PC" -updates $Updates
 
-Please note since 10 June, LCM has been updated to 2.2, LCM will auto update once an inventory is run.
-This script will be updated to support 2.1 asap, but does not atm. 
+Script has been modified to work with LCM 2.2
+But also, to work with PE 5.6. meaning all V3 API calls run through PC.
+Iventory etc is sent directly, but group calls are all proxied through PC.
