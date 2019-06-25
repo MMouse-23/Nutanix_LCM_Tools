@@ -1,16 +1,14 @@
 
 
-
-
 #Input Data
 
 $BuildAccount  = "admin"
 $PEAdmin       = "admin"
-$PEPass        = ""
-$PCCLIP        = ""
-$PEClIP        = ""
+$PEPass        = "nx2Tech430!"
+$PCCLIP        = "10.55.7.40"
+$PEClIP        = "10.55.7.37"
 
-$ClusterUUID   = ""
+$ClusterUUID   = "00058c1b-d6f7-14ed-0000-00000001422c"
 
 
 $datagen = New-Object PSObject;
@@ -109,46 +107,53 @@ Function write-log {
 
 
   
-  Function Wait-Task{
-    do {
-      try{
-        $counter++
-        write-log -message "Wait for inventory Cycle $counter out of 25(minutes)."
-    
-        $PCtasks = REST-Get-AOS-LegacyTask -datagen $datagen -datavar $datavar -mode "PE"
-        $LCMTasks = $PCtasks.entities | where { $_.operation -match "LcmRootTask"}
-        $Inventorycount = 0
-        [array]$Results = $null
-        foreach ($item in $LCMTasks){
-          if ( $item.percentage_complete -eq 100) {
-            $Results += "Done"
-     
-            write-log -message "Inventory $($item.uuid) is completed."
-          } elseif ($item.percentage_complete -ne 100){
-            $Inventorycount ++
-    
-            write-log -message "Inventory $($item.uuid) is still running."
-            write-log -message "We found 1 task $($item.status) and is $($item.percentage_complete) % complete"
-    
-            $Results += "BUSY"
-    
-          }
-        }
-        if ($Results -notcontains "BUSY" -or !$LCMTasks){
+Function Wait-Task{
+  $PCtasks = REST-Get-AOS-LegacyTask -datagen $datagen -datavar $datavar -mode "PE"
+  [array]$LCMTasks = $PCtasks.entities | where { $_.operation -match "LcmRootTask"}
 
-          write-log -message "Inventory is done."
-     
-          $Inventorycheck = "Success"
-     
-        } else{
-          sleep 60
-        }
+  write-log -message "We found $($LCMTasks.count) task(s) to track"  
+
+  do {
+    try{
+      $counter++
+
+      write-log -message "Wait for inventory Cycle $counter out of 25(minutes)."
     
-      }catch{
-        write-log -message "Error caught in loop."
+      $PCtasks = REST-Get-AOS-LegacyTask -datagen $datagen -datavar $datavar -mode "PE"
+      [array]$LCMTasks = $PCtasks.entities | where { $_.operation -match "LcmRootTask"}
+      $Inventorycount = 0
+      [array]$Results = $null
+      foreach ($item in $LCMTasks){
+        if ( $item.percentageCompleted -eq 100) {
+          $Results += "Done"
+            
+          write-log -message "We found 1 task $($item.status) and is $($item.percentageCompleted) % complete"
+          write-log -message "An Inventory with ID $($item.id) is completed."
+
+        } elseif ($item.percentageCompleted -ne 100){
+          $Inventorycount ++
+    
+          write-log -message "An Inventory with ID $($item.id) is still running."
+          write-log -message "We found 1 task $($item.status) and is $($item.percentageCompleted) % complete"
+    
+          $Results += "BUSY"    
+        }
       }
-    } until ($Inventorycheck -eq "Success" -or $counter -ge 10)
-  }
+      if ($Results -notcontains "BUSY" -or !$LCMTasks){
+
+        write-log -message "Inventory is done."
+     
+        $Inventorycheck = "Success"     
+      } else{
+        sleep 60
+      }
+    }catch{
+
+      write-log -message "Error caught in loop."
+
+    }
+  } until ($Inventorycheck -eq "Success" -or $counter -ge 10)
+}
 
 
 
@@ -455,104 +460,70 @@ Function REST-PE-Get-Hosts {
   Return $task
 } 
 
-
 $Clusters = REST-Get-Clusters -datagen $datagen -datavar $datavar -mode "PC"
 
 ### use the cluster ID and set it in the above code
 
 #Logic Inventory
 
-REST-LCM-Perform-Inventory -datavar $datavar -datagen $datagen -mode "PC"
+REST-LCM-Perform-Inventory -datavar $datavar -datagen $datagen -mode "PE"
 
+Wait-Task
 
 #Logic Current
 
-  write-log -message "Checking Which version we have now."
-  $groupcal = 0
-  do {
-    $groupcall ++
-    sleep 10
-    $names = REST-LCMV2-Query-Versions -datagen $datagen -datavar $datavar -mode "PC"
-  } until ($names.group_results.entity_results.count -ge $minimalupdates -or $groupcall -ge $maxgroupcallLoops)
-  $UUIDS = $names.group_results.entity_results.data.values.values | where {$_ -match ".*-.*-.*" -and $_.length -eq 36}
-  $hosts = REST-PE-Get-Hosts -datagen $datagen -datavar $datavar 
-  $versions = $null
-  foreach ($app in $UUIDS){
-    $nodeUUID = (((($names.group_results.entity_results | where {$_.data.values.values -eq $app}).data | where {$_.name -eq "location_id"}).values.values | select -last 1) -split ":")[1]
-    $PHhost = $hosts.entities | where {$_.uuid -match $nodeuuid}
-    $Entity = [PSCustomObject]@{
-      Version     = (($names.group_results.entity_results | where {$_.data.values.values -eq $app}).data | where {$_.name -eq "version"}).values.values | select -last 1
-      Class       = (($names.group_results.entity_results | where {$_.data.values.values -eq $app}).data | where {$_.name -eq "entity_class"}).values.values | select -last 1
-      Name        = (($names.group_results.entity_results | where {$_.data.values.values -eq $app}).data | where {$_.name -eq "entity_model"}).values.values | select -last 1
-      UUID        = $app
-      HostName    = $PHhost.name
-    }
-    [array]$versions += $entity     
-  }  
-  write-log -message "Getting Last Calm Version" 
-
-
-
-
+write-log -message "Checking Which version we have now."
+$groupcal = 0
 do {
-    $counter2++
-    
-    write-log -message "Checking Results"
-    sleep 60
-    $result = REST-LCMV2-Query-Updates -datagen $datagen -datavar $datavar -mode "PC"
-  
-    if ($result.total_entity_count -lt 1){ 
-  
-      write-log -message "There are no updates, retry $counter2 out of 16"
-      
-      Wait-Task
-      sleep 110
-      $result = REST-LCMV2-Query-Updates -datagen $datagen -datavar $datavar -mode "PC"
-    }
-    if ($result.total_entity_count -lt 1 -and $counter2 -lt 2){
-
-      write-log -message "Running LCM Inventory Again"
-
-      REST-LCM-Perform-Inventory -datavar $datavar -datagen $datagen -mode "PC"
-      sleep 115      
-    }
-    if ($counter2 -eq 5 -or $counter2 -eq 12){
-
-      write-log -message "Running LCM Inventory Again"
-
-      REST-LCM-Perform-Inventory -datavar $datavar -datagen $datagen -mode "PC"
-      sleep 115
-    }
-  } until ($result.total_entity_count -ge 1 -or $counter2 -ge 16)
-
-  $UUIDS = $names.group_results.entity_results.data.values.values | where {$_ -match ".*-.*-.*" -and $_.length -eq 36}
-
-  write-log -message "We have $($uuids.count) applications to be updated, seeking version"
+  $groupcall ++
+  sleep 10
   $names = REST-LCMV2-Query-Versions -datagen $datagen -datavar $datavar -mode "PC"
-  $hosts = REST-PE-Get-Hosts -datagen $datagen -datavar $datavar 
-  $Updates = $null
-  foreach ($app in $UUIDs){
-    $nodeUUID = (((($names.group_results.entity_results | where {$_.data.values.values -eq $app}).data | where {$_.name -eq "location_id"}).values.values | select -last 1) -split ":")[1]
-    $PHhost = $hosts.entities | where {$_.uuid -match $nodeuuid}
-    $Entity = [PSCustomObject]@{
-      UUID        = $app
-      Version     = (($result.group_results.entity_results | where {$_.data.values.values -eq $app}).data | where {$_.name -eq "version"}).values.values | select -last 1
-      Class       = (($result.group_results.entity_results | where {$_.data.values.values -eq $app}).data | where {$_.name -eq "entity_class"}).values.values | select -last 1
-      Name        = (($names.group_results.entity_results | where {$_.data.values.values -eq $app}).data | where {$_.name -eq "entity_model"}).values.values | select -last 1
-      HostUUID    = $nodeUUID
-      HostName    = $PHhost.name
-    }
-    [array]$Updates += $entity     
+} until ($names.group_results.entity_results.count -ge $minimalupdates -or $groupcall -ge $maxgroupcallLoops)
+$UUIDS = ($names.group_results.entity_results.data | where {$_.name -eq "uuid"}).values.values
+$hosts = REST-PE-Get-Hosts -datagen $datagen -datavar $datavar 
+$versions = $null
+foreach ($app in $UUIDS){
+  $nodeUUID = (((($names.group_results.entity_results | where {$_.data.values.values -eq $app}).data | where {$_.name -eq "location_id"}).values.values | select -last 1) -split ":")[1]
+  $PHhost = $hosts.entities | where {$_.uuid -match $nodeuuid}
+  $Entity = [PSCustomObject]@{
+    Version     = (($names.group_results.entity_results | where {$_.data.values.values -eq $app}).data | where {$_.name -eq "version"}).values.values | select -last 1
+    Class       = (($names.group_results.entity_results | where {$_.data.values.values -eq $app}).data | where {$_.name -eq "entity_class"}).values.values | select -last 1
+    Name        = (($names.group_results.entity_results | where {$_.data.values.values -eq $app}).data | where {$_.name -eq "entity_model"}).values.values | select -last 1
+    FirmwareUUID= $app
+    HostName    = $PHhost.name
   }
+  [array]$versions += $entity     
+}  
+write-log -message "Current Version / Product Array built."
+write-log -message "Lets do the same for new updates." 
+
+$result = REST-LCMV2-Query-Updates -datagen $datagen -datavar $datavar -mode "PC"
+$UUIDS = ($result.group_results.entity_results.data | where {$_.name -eq "entity_uuid"}).values.values
+
+write-log -message "We have $($uuids.count) applications to be updated, seeking version"
+
+$names = REST-LCMV2-Query-Versions -datagen $datagen -datavar $datavar -mode "PC"
+$hosts = REST-PE-Get-Hosts -datagen $datagen -datavar $datavar 
+$Updates = $null
+foreach ($app in $UUIDs){
+  $nodeUUID = (((($names.group_results.entity_results | where {$_.data.values.values -eq $app}).data | where {$_.name -eq "location_id"}).values.values | select -last 1) -split ":")[1]
+  $PHhost = $hosts.entities | where {$_.uuid -match $nodeuuid}
+  $Entity = [PSCustomObject]@{
+    FirmwareUUID= $app
+    Version     = (($result.group_results.entity_results | where {$_.data.values.values -eq $app}).data | where {$_.name -eq "version"}).values.values | select -last 1
+    Class       = (($result.group_results.entity_results | where {$_.data.values.values -eq $app}).data | where {$_.name -eq "entity_class"}).values.values | select -last 1
+    Name        = (($names.group_results.entity_results | where {$_.data.values.values -eq $app}).data | where {$_.name -eq "entity_model"}).values.values | select -last 1
+    HostUUID    = $nodeUUID
+    HostName    = $PHhost.name
+  }
+  [array]$Updates += $entity     
+}
 
 ## Stop testing beyond here
 
-
 $versions
 
-
 $updates
-
 
 ## Play and manipulate $Updates before sending it into the functions below.
 
@@ -563,4 +534,3 @@ REST-LCM-BuildPlan -datavar $datavar -datagen $datagen -mode "PC" -updates $Upda
 write-log -message "Installing Updates" -slacklevel 1
 
 REST-LCM-Install -datavar $datavar -datagen $datagen -mode "PC" -updates $Updates
-
