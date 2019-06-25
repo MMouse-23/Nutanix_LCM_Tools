@@ -66,7 +66,7 @@ Function REST-LCM-Install {
   $End = ']]}}"}'
   
   foreach ($item in $updates){
-    $update = "[\`"$($item.uuid)\`",\`"$($item.version)\`"],"
+    $update = "[\`"$($item.FirmwareUUID)\`",\`"$($item.version)\`"],"
     $start = $start + $update
   }
   $start = $start.Substring(0,$start.Length-1)
@@ -357,7 +357,7 @@ Function REST-LCM-BuildPlan {
   $End = ']]}}"}'
   
   foreach ($item in $updates){
-    $update = "[\`"$($item.uuid)\`",\`"$($item.version)\`"],"
+    $update = "[\`"$($item.FirmwareUUID)\`",\`"$($item.version)\`"],"
     $start = $start + $update
   }
   $start = $start.Substring(0,$start.Length-1)
@@ -529,8 +529,8 @@ $updates
 
 write-log -message "Building a LCM update Plan" -slacklevel 1
 
-REST-LCM-BuildPlan -datavar $datavar -datagen $datagen -mode "PC" -updates $Updates
+REST-LCM-BuildPlan -datavar $datavar -datagen $datagen -mode "PE" -updates $Updates
 
 write-log -message "Installing Updates" -slacklevel 1
 
-REST-LCM-Install -datavar $datavar -datagen $datagen -mode "PC" -updates $Updates
+REST-LCM-Install -datavar $datavar -datagen $datagen -mode "PE" -updates $Updates
