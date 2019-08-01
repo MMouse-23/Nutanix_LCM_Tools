@@ -473,11 +473,14 @@ Wait-Task
 #Logic Current
 
 write-log -message "Checking Which version we have now."
+$maxgroupcallLoops = 5
+$minimalupdates = 1
 $groupcal = 0
 do {
   $groupcall ++
   sleep 10
   $names = REST-LCMV2-Query-Versions -datagen $datagen -datavar $datavar -mode "PC"
+  write-log -message "$($names.group_results.entity_results.count) <- nr updates found"
 } until ($names.group_results.entity_results.count -ge $minimalupdates -or $groupcall -ge $maxgroupcallLoops)
 $UUIDS = ($names.group_results.entity_results.data | where {$_.name -eq "uuid"}).values.values
 $hosts = REST-PE-Get-Hosts -datagen $datagen -datavar $datavar 
@@ -534,3 +537,4 @@ REST-LCM-BuildPlan -datavar $datavar -datagen $datagen -mode "PE" -updates $Upda
 write-log -message "Installing Updates" -slacklevel 1
 
 REST-LCM-Install -datavar $datavar -datagen $datagen -mode "PE" -updates $Updates
+
