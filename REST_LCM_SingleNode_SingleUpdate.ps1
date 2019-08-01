@@ -538,3 +538,4 @@ write-log -message "Installing Updates" -slacklevel 1
 
 REST-LCM-Install -datavar $datavar -datagen $datagen -mode "PE" -updates $Updates
 
+Wait-Task
