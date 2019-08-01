@@ -475,7 +475,7 @@ Wait-Task
 write-log -message "Checking Which version we have now."
 $maxgroupcallLoops = 5
 $minimalupdates = 1
-$groupcal = 0
+$groupcall = 0
 do {
   $groupcall ++
   sleep 10
